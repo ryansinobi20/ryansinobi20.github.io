@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Word Hunt – For Jujubi</title>
+
+  <!-- Cute Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #ffd6e8, #ffeaf4);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .game-box {
+      background: #fff0f7;
+      padding: 22px;
+      border-radius: 20px;
+      width: 460px;
+      text-align: center;
+      box-shadow: 0 12px 30px rgba(255,105,180,0.25);
+    }
+
+    h1 {
+      font-family: 'Pacifico', cursive;
+      color: #e11d8f;
+      margin-bottom: 6px;
+    }
+
+    .hint { font-size: 13px; color: #9d174d; }
+    .score { margin: 10px 0; font-weight: 600; font-size: 16px; color: #9d174d; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .cell {
+      background: #ffe4f1;
+      border-radius: 12px;
+      padding: 16px 0;
+      font-size: 17px;
+      font-weight: bold;
+      user-select: none;
+      cursor: pointer;
+      color: #9d174d;
+    }
+
+    .cell.selected { background: #fbcfe8; }
+    .cell.found { background: #f472b6; color: white; }
+
+    .result { font-weight: bold; margin-top: 8px; min-height: 20px; color: #9d174d; }
+
+    .footer {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #9d174d;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,105,180,0.75);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .popup {
+      background: #fff0f7;
+      padding: 36px;
+      border-radius: 26px;
+      text-align: center;
+      max-width: 90%;
+      width: 340px;
+      animation: popIn 0.6s ease;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .heart {
+      font-size: 46px;
+      margin-bottom: 10px;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .popup-text {
+      font-family: 'Pacifico', cursive;
+      font-size: 26px;
+      color: #e11d8f;
+      margin-bottom: 20px;
+      white-space: pre-line;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 10px 26px;
+      border-radius: 999px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-yes {
+      background: #ec4899;
+      color: #ffffff;
+    }
+
+    .btn-no {
+      background: #fbcfe8;
+      color: #9d174d;
+      position: relative;
+    }
+
+    .btn:hover { opacity: 0.9; }
+
+    .confetti {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      background: pink;
+      top: -10px;
+      animation: fall 3s linear forwards;
+      z-index: 20;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+
+    /* Start button styling */
+    .start-row {
+      margin: 12px 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .start-btn {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: #ec4899;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Preload the music but don't autoplay (browsers block autoplay without user gesture) -->
+  <audio id="bgMusic" src="https://cdn.pixabay.com/audio/2022/10/30/audio_4c3f83f73b.mp3" preload="auto"></audio>
+
+  <div class="game-box">
+    <h1>Word Hunt</h1>
+    <div class="hint">Find the words in order. Adjacent & diagonal moves allowed.</div>
+
+    <!-- Start button: required so music.play() is triggered by a user gesture (avoids autoplay-block issues) -->
+    <div class="start-row">
+      <button id="startBtn" class="start-btn">Start Game & Play Music</button>
+    </div>
+
+    <div class="score" id="score">Score: 0 / 6</div>
+
+    <div class="grid" id="grid" aria-label="word-hunt-grid"></div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="footer">For Jujubi by DaTam &lt;3</div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true">
+    <div class="popup">
+      <div class="heart">❤️</div>
+      <div class="popup-text" id="popupText">Will you be my girlfriend?</div>
+      <div class="buttons" id="buttons">
+        <button class="btn btn-yes" onclick="handleYes()">Yes</button>
+        <button class="btn btn-no" id="noBtn">No</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GRID_SIZE = 7;
+    const targetWords = ["will", "you", "be", "my", "girl", "friend"];
+
+    let score = 0;
+    let currentWord = "";
+    let selectedCells = [];
+    let isSelecting = false;
+
+    const rawGrid = [
+      "W I L L Y O U",
+      "B E A T R O M",
+      "M Y G I R L S",
+      "Q Z D F X X X",
+      "L P E R X X X",
+      "U V I E X X X",
+      "N O N D X X X"
+    ];
+
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // Turn the raw grid into a flat array of letters (replace X with random letters)
+    const gridMatrix = rawGrid
+      .join(" ")
+      .split(" ")
+      .map(l => l === "X" ? alphabet[Math.floor(Math.random() * alphabet.length)] : l);
+
+    const grid = document.getElementById("grid");
+    const result = document.getElementById("result");
+    const scoreDisplay = document.getElementById("score");
+    const overlay = document.getElementById("overlay");
+    const music = document.getElementById("bgMusic");
+    const startBtn = document.getElementById("startBtn");
+
+    // Populate grid
+    gridMatrix.forEach((letter, index) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = letter;
+      cell.dataset.index = index;
+
+      // pointer events are used so it works on mouse & touch
+      cell.addEventListener("pointerdown", (e) => {
+        // Prevent text selection on long press
+        e.preventDefault();
+        isSelecting = true;
+        selectCell(cell);
+      });
+
+      cell.addEventListener("pointerenter", () => {
+        if (isSelecting) selectCell(cell);
+      });
+
+      grid.appendChild(cell);
+    });
+
+    document.body.addEventListener("pointerup", endSelection);
+
+    function isAdjacent(a, b) {
+      const rowA = Math.floor(a / GRID_SIZE);
+      const colA = a % GRID_SIZE;
+      const rowB = Math.floor(b / GRID_SIZE);
+      const colB = b % GRID_SIZE;
+      return Math.abs(rowA - rowB) <= 1 && Math.abs(colA - colB) <= 1;
+    }
+
+    function selectCell(cell) {
+      const index = parseInt(cell.dataset.index);
+      if (cell.classList.contains("selected") || cell.classList.contains("found")) return;
+
+      if (selectedCells.length > 0) {
+        const lastIndex = parseInt(selectedCells[selectedCells.length - 1].dataset.index);
+        if (!isAdjacent(lastIndex, index)) return;
+      }
+
+      cell.classList.add("selected");
+      selectedCells.push(cell);
+      currentWord += cell.textContent.toLowerCase();
+    }
+
+    function endSelection() {
+      if (!isSelecting) return;
+      isSelecting = false;
+
+      const expectedWord = targetWords[score];
+
+      if (currentWord === expectedWord) {
+        score++;
+        selectedCells.forEach(c => {
+          c.classList.remove("selected");
+          c.classList.add("found");
+        });
+        result.textContent = `Found: ${currentWord}`;
+      } else {
+        selectedCells.forEach(c => c.classList.remove("selected"));
+        result.textContent = "Wrong word or wrong order";
+      }
+
+      currentWord = "";
+      selectedCells = [];
+      scoreDisplay.textContent = `Score: ${score} / ${targetWords.length}`;
+
+      if (score === targetWords.length) {
+        overlay.style.display = "flex";
+        // Try to play music if user started it already; otherwise it's fine — we already required a user click to start.
+        safePlayMusic();
+      }
+    }
+
+    // Play music safely (catch promise rejection, required if play is blocked)
+    async function safePlayMusic() {
+      try {
+        await music.play();
+      } catch (err) {
+        // If browser blocked autoplay, ignore. Music will play once user clicks start.
+        console.warn('Music playback was blocked or failed:', err);
+      }
+    }
+
+    // Start button ensures a user gesture exists to allow audio playback in browsers
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Good luck!';
+      await safePlayMusic();
+      // visually indicate the button has been used and let game proceed
+    });
+
+    function handleYes() {
+      document.getElementById('popupText').textContent = "June says Yes to Da Tam ❤️\nCapturing this moment – 15/12/2025";
+      document.getElementById('buttons').style.display = "none";
+      launchConfetti();
+    }
+
+    const noBtn = document.getElementById('noBtn');
+    // Move the 'No' button away on hover to be playful, but use pointermove for mobile friendliness
+    noBtn.addEventListener('pointerenter', () => {
+      noBtn.style.transform = `translate(${Math.random()*80-40}px, ${Math.random()*80-40}px)`;
+    });
+
+    function launchConfetti() {
+      for (let i = 0; i < 80; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.background = ['#ec4899','#f472b6','#f9a8d4'][Math.floor(Math.random()*3)];
+        confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 4000);
+      }
+    }
+  </script>
+</body>
+</html>
