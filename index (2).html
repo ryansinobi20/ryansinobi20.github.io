@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Word Hunt – For Jujubi</title>
+
+  <!-- Cute Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* --- ORIENTATION LOCK (PORTRAIT) --- */
+    @media screen and (orientation: landscape) {
+      body::before {
+        content: "Please rotate your phone back to portrait mode 💗";
+        position: fixed;
+        inset: 0;
+        background: #ffd6e8;
+        color: #9d174d;
+        font-family: 'Pacifico', cursive;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 24px;
+        z-index: 9999;
+      }
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overscroll-behavior: none;
+      touch-action: none;
+      background: linear-gradient(135deg, #ffd6e8, #ffeaf4);
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .game-box {
+      background: #fff0f7;
+      padding: 14px;
+      border-radius: 18px;
+      width: 320px; /* SMALLER FRAME */
+      text-align: center;
+      box-shadow: 0 12px 30px rgba(255,105,180,0.25);
+    }
+
+    h1 {
+      font-family: 'Pacifico', cursive;
+      color: #e11d8f;
+      margin: 6px 0;
+      font-size: 26px;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #9d174d;
+    }
+
+    .score {
+      margin: 8px 0;
+      font-weight: 600;
+      font-size: 14px;
+      color: #9d174d;
+    }
+
+    /* --- GRID --- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin: 12px 0;
+    }
+
+    .cell {
+      background: #ffe4f1;
+      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #9d174d;
+      user-select: none;
+    }
+
+    .cell.selected { background: #fbcfe8; }
+    .cell.found { background: #f472b6; color: #fff; }
+
+    .result {
+      min-height: 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #9d174d;
+    }
+
+    .footer {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #9d174d;
+    }
+
+    /* --- POPUP --- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,105,180,0.75);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .popup {
+      background: #fff0f7;
+      padding: 30px;
+      border-radius: 24px;
+      text-align: center;
+      width: 300px;
+      animation: popIn 0.6s ease;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .heart {
+      font-size: 42px;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .popup-text {
+      font-family: 'Pacifico', cursive;
+      font-size: 22px;
+      color: #e11d8f;
+      margin: 16px 0;
+    }
+
+    .btn {
+      padding: 8px 22px;
+      border-radius: 999px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-yes { background: #ec4899; color: #fff; }
+    .btn-no { background: #fbcfe8; color: #9d174d; }
+
+  </style>
+</head>
+<body>
+
+  <div class="game-box">
+    <h1>Word Hunt</h1>
+    <div class="hint">Tap letters in order (no sliding needed)</div>
+    <div class="score" id="score">Score: 0 / 6</div>
+    <div class="grid" id="grid"></div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="footer">For Jujubi by DaTam &lt;3</div>
+
+  <div class="overlay" id="overlay">
+    <div class="popup">
+      <div class="heart">❤️</div>
+      <div class="popup-text" id="popupText">Will you be my girlfriend?</div>
+      <button class="btn btn-yes" onclick="handleYes()">Yes</button>
+    </div>
+  </div>
+
+  <script>
+    const GRID_SIZE = 7;
+    const words = ["will","you","be","my","girl","friend"];
+
+    const rawGrid = [
+      "W I L L Y O U",
+      "B E A T R O M",
+      "M Y G I R L S",
+      "Q Z D F H A K",
+      "L P E R N O D",
+      "U V I E T C A",
+      "N O N D E R L"
+    ];
+
+    const gridLetters = rawGrid.join(" ").split(" ");
+    const grid = document.getElementById("grid");
+    const scoreEl = document.getElementById("score");
+    const resultEl = document.getElementById("result");
+    const overlay = document.getElementById("overlay");
+
+    let score = 0;
+    let current = "";
+    let selected = [];
+
+    gridLetters.forEach((letter, i) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = letter;
+      cell.addEventListener("click", () => tapCell(cell));
+      grid.appendChild(cell);
+    });
+
+    function tapCell(cell) {
+      if (cell.classList.contains("found")) return;
+
+      cell.classList.add("selected");
+      selected.push(cell);
+      current += cell.textContent.toLowerCase();
+
+      if (current === words[score]) {
+        navigator.vibrate?.(80);
+        selected.forEach(c => {
+          c.classList.remove("selected");
+          c.classList.add("found");
+        });
+        score++;
+        resultEl.textContent = `Found: ${current}`;
+        resetSelection();
+      } else if (!words[score].startsWith(current)) {
+        resetSelection();
+        resultEl.textContent = "Try again";
+      }
+
+      scoreEl.textContent = `Score: ${score} / 6`;
+
+      if (score === 6) overlay.style.display = "flex";
+    }
+
+    function resetSelection() {
+      selected.forEach(c => c.classList.remove("selected"));
+      selected = [];
+      current = "";
+    }
+
+    function handleYes() {
+      document.getElementById("popupText").textContent = "June says Yes to Da Tam ❤️\nCapturing this moment – 15/12/2025";
+    }
+  </script>
+</body>
+</html>
